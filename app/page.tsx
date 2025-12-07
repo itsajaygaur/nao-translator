@@ -25,7 +25,7 @@ export default function Home() {
   const [translatedText, setTranslatedText] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
 
-  const { transcript, listening, resetTranscript } = useSpeechRecognition();
+  const { transcript, listening, resetTranscript, browserSupportsSpeechRecognition } = useSpeechRecognition();
 
   const { speechStatus, start, pause, stop } = useSpeech({
     text: translatedText,
@@ -63,6 +63,7 @@ export default function Home() {
       handleFinalTextUpdate(transcript);
     }
   }, [listening, transcript, handleFinalTextUpdate]);
+
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-8">
@@ -125,6 +126,13 @@ export default function Home() {
             <Mic className="text-white size-7" />
           )}
         </Button>
+
+        {
+          !browserSupportsSpeechRecognition &&
+          <p className="text-red-500 font-medium">
+            Your browser does not support speech recognition.
+          </p>
+        }
 
         {/* STATUS */}
         {listening && (
