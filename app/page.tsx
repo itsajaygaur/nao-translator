@@ -1,65 +1,209 @@
-import Image from "next/image";
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { translateAction } from "./actions";
+import SpeechRecognition, {
+  useSpeechRecognition,
+} from "react-speech-recognition";
+import SelectLanguage from "@/components/select-language";
+import { Button } from "@/components/ui/button";
+import { useSpeech } from "react-text-to-speech";
+
+import {
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+  Languages,
+  RotateCcw,
+  Loader2,
+} from "lucide-react";
 
 export default function Home() {
+  const [inputLanguage, setInputLanguage] = useState("en-US");
+  const [outputLanguage, setOutputLanguage] = useState("en-US");
+  const [translatedText, setTranslatedText] = useState("");
+  const [isTranslating, setIsTranslating] = useState(false);
+
+  const { transcript, listening, resetTranscript } = useSpeechRecognition();
+
+  const { speechStatus, start, pause, stop } = useSpeech({
+    text: translatedText,
+    lang: outputLanguage,
+  });
+
+  // Translate final speech once mic stops
+  const handleFinalTextUpdate = useCallback(
+    async (text: string) => {
+      if (!text.trim()) return;
+      setIsTranslating(true);
+
+      try {
+        const translated = await translateAction({
+          text,
+          source: inputLanguage,
+          target: outputLanguage,
+        });
+
+        if (!translated) throw new Error("Translation failed");
+
+        setTranslatedText(translated);
+      } catch (error: unknown) {
+        alert(error instanceof Error ? error.message : "Unknown error");
+      } finally {
+        setIsTranslating(false);
+      }
+    },
+    [inputLanguage, outputLanguage]
+  );
+
+  // Run translation automatically when listening stops
+  useEffect(() => {
+    if (!listening && transcript.trim()) {
+      handleFinalTextUpdate(transcript);
+    }
+  }, [listening, transcript, handleFinalTextUpdate]);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="p-6 max-w-3xl mx-auto space-y-8">
+      {/* HEADER */}
+      <header className="flex justify-center mb-3">
+        <h1 className="text-3xl font-bold flex items-center gap-2">
+          <Languages size={30} />
+          Nao Medical Translator
+        </h1>
+      </header>
+
+      {/* LANGUAGE SELECTORS */}
+      <section className="bg-white shadow-md p-5 rounded-xl border space-y-4">
+        <h2 className="font-semibold text-lg flex items-center gap-2">
+          <Languages size={20} />
+          Language Settings
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <p className="text-sm mb-1 font-medium">Input Language</p>
+            <SelectLanguage
+              value={inputLanguage}
+              onValueChange={setInputLanguage}
+            />
+          </div>
+
+          <div>
+            <p className="text-sm mb-1 font-medium">Output Language</p>
+            <SelectLanguage
+              value={outputLanguage}
+              onValueChange={setOutputLanguage}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* MIC SECTION */}
+      <section className="text-center space-y-4">
+        <p className="text-gray-600">
+          Press the microphone and start speaking.
+        </p>
+
+        <Button
+          className={`h-20 w-20 rounded-full shadow-lg transition-all duration-300
+            ${listening ? "bg-red-500 hover:bg-red-600 scale-105" : "bg-blue-500 hover:bg-blue-600"}
+          `}
+          onClick={() =>
+            listening
+              ? SpeechRecognition.stopListening()
+              : SpeechRecognition.startListening({
+                  continuous: true,
+                  language: inputLanguage,
+                })
+          }
+        >
+          {listening ? (
+            <MicOff className="text-white size-7" />
+          ) : (
+            <Mic className="text-white size-7" />
+          )}
+        </Button>
+
+        {/* STATUS */}
+        {listening && (
+          <p className="text-red-500 animate-pulse font-medium">
+            Listening...
+          </p>
+        )}
+        {isTranslating && (
+          <p className="text-blue-500 flex items-center justify-center gap-2 font-medium">
+            <Loader2 className="animate-spin" size={18} />
+            Translating...
+          </p>
+        )}
+      </section>
+
+      {/* TEXT PANELS */}
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* SPEECH */}
+        <div className="bg-gray-50 border rounded-xl p-4 h-56 overflow-auto shadow-inner">
+          <p className="text-xs text-gray-500 mb-1 font-medium">Your Speech</p>
+          <p className="whitespace-pre-wrap text-gray-700">
+            {transcript || "Start speaking to see transcription..."}
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* TRANSLATION */}
+        <div className="bg-gray-50 border rounded-xl p-4 h-56 overflow-auto shadow-inner">
+          <p className="text-xs text-gray-500 mb-1 font-medium">Translation</p>
+          <p className="whitespace-pre-wrap text-gray-700">
+            {!translatedText && !isTranslating
+              ? "Translation will appear here..."
+              : isTranslating
+              ? "Translating..."
+              : translatedText}
+          </p>
         </div>
-      </main>
+      </section>
+
+      {/* CONTROLS */}
+      <section className="flex flex-wrap justify-between gap-4">
+        {/* Reset Transcription */}
+        <Button
+          variant="outline"
+          onClick={resetTranscript}
+          disabled={listening}
+          className="flex items-center gap-2"
+        >
+          <RotateCcw size={18} />
+          Reset Speech
+        </Button>
+
+        {/* Speech Output */}
+        <div className="flex gap-3">
+          {speechStatus !== "started" ? (
+            <Button
+              onClick={start}
+              disabled={!translatedText}
+              className="flex items-center gap-2"
+            >
+              <Volume2 size={18} /> Speak Translation
+            </Button>
+          ) : (
+            <Button
+              onClick={pause}
+              className="flex items-center gap-2"
+            >
+              <VolumeX size={18} /> Pause
+            </Button>
+          )}
+
+          <Button
+            variant="destructive"
+            onClick={stop}
+            className="flex items-center gap-2"
+          >
+            Stop
+          </Button>
+        </div>
+      </section>
     </div>
   );
 }
